@@ -353,10 +353,13 @@ var sel = document.getElementById('ftf-country');
       }
       if (!lat) { setMsg('Could not locate that place. Try a different city.', true); btn.textContent='+ Add My Pin'; btn.disabled=false; return; }
       var saveUrl = SCRIPT_URL + '?action=add&name=' + encodeURIComponent(name) + '&email=' + encodeURIComponent(email) + '&country=' + encodeURIComponent(countryName) + '&state=' + encodeURIComponent(state) + '&city=' + encodeURIComponent(city) + '&lat=' + lat + '&lng=' + lng;
-      // Use no-cors image beacon to avoid CORS issues
-      var img = new Image();
-      img.src = saveUrl;
-      await new Promise(function(resolve){ setTimeout(resolve, 1500); });
+      // Use hidden iframe to send request without CORS issues
+      var ifrm = document.createElement('iframe');
+      ifrm.style.display = 'none';
+      ifrm.src = saveUrl;
+      document.body.appendChild(ifrm);
+      await new Promise(function(resolve){ setTimeout(resolve, 2000); });
+      document.body.removeChild(ifrm);
       addMarker(name, city || state, countryName, lat, lng, true);
       map.flyTo([lat, lng], 5, { duration: 1.2 });
       setMsg('Your pin has been added! Welcome to the FTF world map!', false);
