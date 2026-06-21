@@ -1,0 +1,229 @@
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<div id="ftf-map-wrap" style="border-radius:12px;overflow:hidden;border:1px solid #222;font-family:sans-serif;">
+
+  <div style="background:#0a0a0a;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+    <div style="font-size:12px;font-weight:600;color:#fff;letter-spacing:0.1em;text-transform:uppercase;">FTF — World Map of Members</div>
+    <div style="display:flex;gap:20px;">
+      <div style="font-size:12px;color:#777;">Members: <b id="ftf-cnt" style="color:#C9A96E;font-weight:600;">32,989</b></div>
+      <div style="font-size:12px;color:#777;">Countries: <b id="ftf-ctry" style="color:#C9A96E;font-weight:600;">94</b></div>
+    </div>
+  </div>
+
+  <div id="ftf-map" style="width:100%;height:480px;"></div>
+
+  <div style="background:#0a0a0a;padding:16px;border-top:1px solid #222;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+      <div>
+        <label style="display:block;font-size:11px;color:#777;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">Your Name *</label>
+        <input id="ftf-name" placeholder="Full name" style="width:100%;background:#161616;border:1px solid #333;border-radius:6px;padding:9px 12px;font-size:13px;color:#fff;outline:none;box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;color:#777;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">Email Address *</label>
+        <input id="ftf-email" type="email" placeholder="you@email.com" style="width:100%;background:#161616;border:1px solid #333;border-radius:6px;padding:9px 12px;font-size:13px;color:#fff;outline:none;box-sizing:border-box;">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div>
+        <label style="display:block;font-size:11px;color:#777;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">Country *</label>
+        <select id="ftf-country" onchange="ftfLoadStates()" style="width:100%;background:#161616;border:1px solid #333;border-radius:6px;padding:9px 12px;font-size:13px;color:#fff;outline:none;box-sizing:border-box;">
+          <option value="">Select country...</option>
+        </select>
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;color:#777;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">State / Region</label>
+        <select id="ftf-state" onchange="ftfLoadCities()" style="width:100%;background:#161616;border:1px solid #333;border-radius:6px;padding:9px 12px;font-size:13px;color:#fff;outline:none;box-sizing:border-box;" disabled>
+          <option value="">Select state...</option>
+        </select>
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;color:#777;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">City</label>
+        <select id="ftf-city" style="width:100%;background:#161616;border:1px solid #333;border-radius:6px;padding:9px 12px;font-size:13px;color:#fff;outline:none;box-sizing:border-box;" disabled>
+          <option value="">Select city...</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+      <p id="ftf-msg" style="font-size:12px;color:#C9A96E;margin:0;min-height:16px;"></p>
+      <button id="ftf-btn" onclick="ftfAddPin()" style="background:#c50000;border:none;border-radius:6px;padding:10px 24px;font-size:13px;color:#fff;font-weight:600;cursor:pointer;white-space:nowrap;">+ Add My Pin</button>
+    </div>
+  </div>
+
+</div>
+
+<hr style="border:none;border-top:1px solid #333;margin:48px 0;">
+<p style="font-family:sans-serif;color:#888;font-size:13px;margin-bottom:8px;"><b style="color:#ccc;">Original Member Map (Legacy)</b> — for older members who already added their pin here.</p>
+<div style="text-align:left;">
+  <a href="https://www.google.com/maps/d/u/2/edit?mid=13y6TcB-EvBkDaVpF1l4fjYB9S1noB9sM&ll=31.684999945979676%2C-79.33222721436138&z=4" target="_blank" style="padding:10px 22px;font-size:14px;background-color:#333;color:#fff;text-decoration:none;border-radius:30px;display:inline-block;" rel="noopener noreferrer">View Old Member Map</a>
+</div>
+
+<script>
+(function() {
+  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw8WU2vObMNnzM9K1oBk1JzlezvNgRQ98BIVGM9SzxcdYpCim2pAV-TQArizDshzJtBNw/exec';
+  var pinCount = 32989;
+  var countrySet = {};
+
+  var map = L.map('ftf-map', { zoomControl: true, scrollWheelZoom: false }).setView([20, 10], 2);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap &copy; CARTO',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(map);
+
+  function makeIcon(gold) {
+    var size = gold ? 13 : 8;
+    var color = gold ? '#C9A96E' : '#c50000';
+    return L.divIcon({
+      className: '',
+      html: '<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;background:'+color+';border:1.5px solid rgba(255,255,255,0.5);box-shadow:0 0 4px rgba(0,0,0,0.6);"></div>',
+      iconSize: [size, size],
+      iconAnchor: [size/2, size/2]
+    });
+  }
+
+  function addMarker(name, city, country, lat, lng, gold) {
+    L.marker([lat, lng], { icon: makeIcon(gold) })
+      .addTo(map)
+      .bindPopup('<div style="font-family:sans-serif;"><b style="color:#fff;font-size:13px;">'+name+'</b><br><span style="color:#C9A96E;font-size:12px;">'+(city?city+', ':'')+country+'</span></div>');
+    if (gold) {
+      pinCount++;
+      countrySet[country] = true;
+      document.getElementById('ftf-cnt').textContent = pinCount.toLocaleString();
+      document.getElementById('ftf-ctry').textContent = Object.keys(countrySet).length;
+    }
+  }
+
+  function loadPins() {
+    fetch(SCRIPT_URL + '?action=get')
+      .then(function(r){ return r.json(); })
+      .then(function(rows){
+        rows.forEach(function(r){
+          addMarker(r.name, r.city, r.country, parseFloat(r.lat), parseFloat(r.lng), false);
+        });
+      })
+      .catch(function(){ console.warn('FTF map: could not load pins'); });
+  }
+  loadPins();
+
+  fetch('https://restcountries.com/v3.1/all?fields=name,cca2')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      data.sort(function(a,b){ return a.name.common.localeCompare(b.name.common); });
+      var sel = document.getElementById('ftf-country');
+      data.forEach(function(c){
+        var o = document.createElement('option');
+        o.value = c.cca2; o.textContent = c.name.common;
+        o.setAttribute('data-name', c.name.common);
+        sel.appendChild(o);
+      });
+    });
+
+  window.ftfLoadStates = function() {
+    var cca2 = document.getElementById('ftf-country').value;
+    var stateSel = document.getElementById('ftf-state');
+    var citySel = document.getElementById('ftf-city');
+    stateSel.innerHTML = '<option value="">Loading...</option>';
+    stateSel.disabled = true;
+    citySel.innerHTML = '<option value="">Select city...</option>';
+    citySel.disabled = true;
+    if (!cca2) return;
+    fetch('https://countriesnow.space/api/v0.1/countries/states', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ iso2: cca2 })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      stateSel.innerHTML = '<option value="">Select state...</option>';
+      if (d.data && d.data.states && d.data.states.length) {
+        d.data.states.forEach(function(s){
+          var o = document.createElement('option');
+          o.value = s.name; o.textContent = s.name;
+          stateSel.appendChild(o);
+        });
+        stateSel.disabled = false;
+      } else {
+        stateSel.innerHTML = '<option value="">No states available</option>';
+      }
+    });
+  };
+
+  window.ftfLoadCities = function() {
+    var countryEl = document.getElementById('ftf-country');
+    var countryName = countryEl.options[countryEl.selectedIndex].getAttribute('data-name');
+    var state = document.getElementById('ftf-state').value;
+    var citySel = document.getElementById('ftf-city');
+    citySel.innerHTML = '<option value="">Loading...</option>';
+    citySel.disabled = true;
+    if (!state) return;
+    fetch('https://countriesnow.space/api/v0.1/countries/state/cities', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ country: countryName, state: state })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      citySel.innerHTML = '<option value="">Select city...</option>';
+      if (d.data && d.data.length) {
+        d.data.forEach(function(city){
+          var o = document.createElement('option');
+          o.value = city; o.textContent = city;
+          citySel.appendChild(o);
+        });
+        citySel.disabled = false;
+      } else {
+        citySel.innerHTML = '<option value="">No cities found</option>';
+      }
+    });
+  };
+
+  function setMsg(msg, err) {
+    var el = document.getElementById('ftf-msg');
+    el.textContent = msg;
+    el.style.color = err ? '#ff6b6b' : '#C9A96E';
+  }
+
+  window.ftfAddPin = async function() {
+    var name = document.getElementById('ftf-name').value.trim();
+    var email = document.getElementById('ftf-email').value.trim();
+    var countryEl = document.getElementById('ftf-country');
+    var countryCode = countryEl.value;
+    var countryName = countryEl.selectedIndex > 0 ? countryEl.options[countryEl.selectedIndex].getAttribute('data-name') : '';
+    var state = document.getElementById('ftf-state').value;
+    var city = document.getElementById('ftf-city').value;
+
+    if (!name) { setMsg('Please enter your name.', true); return; }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setMsg('Please enter a valid email.', true); return; }
+    if (!countryCode) { setMsg('Please select your country.', true); return; }
+
+    var locationQuery = [city, state, countryName].filter(Boolean).join(', ');
+    var btn = document.getElementById('ftf-btn');
+    btn.textContent = 'Pinning...';
+    btn.disabled = true;
+    setMsg('Finding your location...', false);
+
+    try {
+      var geo = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(locationQuery) + '&format=json&limit=1', { headers: { 'Accept-Language': 'en' } });
+      var gd = await geo.json();
+      if (!gd.length) { setMsg('Could not locate that place. Try a different city.', true); btn.textContent='+ Add My Pin'; btn.disabled=false; return; }
+      var lat = parseFloat(gd[0].lat), lng = parseFloat(gd[0].lon);
+      await fetch(SCRIPT_URL + '?action=add&name=' + encodeURIComponent(name) + '&email=' + encodeURIComponent(email) + '&country=' + encodeURIComponent(countryName) + '&state=' + encodeURIComponent(state) + '&city=' + encodeURIComponent(city) + '&lat=' + lat + '&lng=' + lng);
+      addMarker(name, city || state, countryName, lat, lng, true);
+      map.flyTo([lat, lng], 5, { duration: 1.2 });
+      setMsg('Your pin has been added! Welcome to the FTF world map!', false);
+      document.getElementById('ftf-name').value = '';
+      document.getElementById('ftf-email').value = '';
+      document.getElementById('ftf-country').value = '';
+      document.getElementById('ftf-state').innerHTML = '<option value="">Select state...</option>';
+      document.getElementById('ftf-state').disabled = true;
+      document.getElementById('ftf-city').innerHTML = '<option value="">Select city...</option>';
+      document.getElementById('ftf-city').disabled = true;
+    } catch(e) {
+      setMsg('Something went wrong. Please try again.', true);
+    }
+    btn.textContent = '+ Add My Pin';
+    btn.disabled = false;
+  };
+
+})();
+</script>
