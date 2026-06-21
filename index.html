@@ -81,7 +81,14 @@
     'Uruguay':1,'Madagascar':1
   };
 
-  var map = L.map('ftf-map', { zoomControl: true, scrollWheelZoom: false }).setView([20, 10], 2);
+  var map = L.map('ftf-map', {
+    zoomControl: true,
+    scrollWheelZoom: false,
+    worldCopyJump: false,
+    maxBounds: [[-90, -180], [90, 180]],
+    maxBoundsViscosity: 1.0,
+    minZoom: 2
+  }).setView([20, 10], 2);
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; OpenStreetMap &copy; CARTO',
