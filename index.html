@@ -300,7 +300,11 @@ var sel = document.getElementById('ftf-country');
       var gd = await geo.json();
       if (!gd.length) { setMsg('Could not locate that place. Try a different city.', true); btn.textContent='+ Add My Pin'; btn.disabled=false; return; }
       var lat = parseFloat(gd[0].lat), lng = parseFloat(gd[0].lon);
-      await fetch(SCRIPT_URL + '?action=add&name=' + encodeURIComponent(name) + '&email=' + encodeURIComponent(email) + '&country=' + encodeURIComponent(countryName) + '&state=' + encodeURIComponent(state) + '&city=' + encodeURIComponent(city) + '&lat=' + lat + '&lng=' + lng);
+      var saveUrl = SCRIPT_URL + '?action=add&name=' + encodeURIComponent(name) + '&email=' + encodeURIComponent(email) + '&country=' + encodeURIComponent(countryName) + '&state=' + encodeURIComponent(state) + '&city=' + encodeURIComponent(city) + '&lat=' + lat + '&lng=' + lng;
+      // Use no-cors image beacon to avoid CORS issues
+      var img = new Image();
+      img.src = saveUrl;
+      await new Promise(function(resolve){ setTimeout(resolve, 1500); });
       addMarker(name, city || state, countryName, lat, lng, true);
       map.flyTo([lat, lng], 5, { duration: 1.2 });
       setMsg('Your pin has been added! Welcome to the FTF world map!', false);
