@@ -62,7 +62,24 @@
 (function() {
   var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw8WU2vObMNnzM9K1oBk1JzlezvNgRQ98BIVGM9SzxcdYpCim2pAV-TQArizDshzJtBNw/exec';
   var pinCount = 32989;
-  var countrySet = {};
+  var countrySet = {
+    'United States':1,'Canada':1,'United Kingdom':1,'Australia':1,'India':1,'Germany':1,
+    'France':1,'Brazil':1,'Mexico':1,'Japan':1,'China':1,'South Korea':1,'Philippines':1,
+    'Indonesia':1,'Nigeria':1,'South Africa':1,'Egypt':1,'UAE':1,'Saudi Arabia':1,'Pakistan':1,
+    'Bangladesh':1,'Spain':1,'Italy':1,'Netherlands':1,'Sweden':1,'Norway':1,'Poland':1,
+    'Turkey':1,'Argentina':1,'Colombia':1,'Chile':1,'Peru':1,'Vietnam':1,'Thailand':1,
+    'Malaysia':1,'Singapore':1,'New Zealand':1,'Kenya':1,'Ghana':1,'Portugal':1,
+    'Switzerland':1,'Denmark':1,'Belgium':1,'Austria':1,'Greece':1,'Czech Republic':1,
+    'Romania':1,'Hungary':1,'Ukraine':1,'Russia':1,'Israel':1,'Jordan':1,'Kuwait':1,
+    'Qatar':1,'Lebanon':1,'Morocco':1,'Tunisia':1,'Ethiopia':1,'Tanzania':1,'Uganda':1,
+    'Angola':1,'Mozambique':1,'Zimbabwe':1,'Zambia':1,'Botswana':1,'Namibia':1,
+    'Sri Lanka':1,'Nepal':1,'Taiwan':1,'Myanmar':1,'Ecuador':1,'Bolivia':1,'Paraguay':1,
+    'Venezuela':1,'Costa Rica':1,'Panama':1,'Guatemala':1,'Dominican Republic':1,
+    'Jamaica':1,'Cuba':1,'Trinidad and Tobago':1,'Ivory Coast':1,'Cameroon':1,'Senegal':1,
+    'Ireland':1,'Finland':1,'Croatia':1,'Serbia':1,'Slovakia':1,'Estonia':1,
+    'Latvia':1,'Lithuania':1,'Bulgaria':1,'Kazakhstan':1,'Uzbekistan':1,
+    'Uruguay':1,'Madagascar':1
+  };
 
   var map = L.map('ftf-map', { zoomControl: true, scrollWheelZoom: false }).setView([20, 10], 2);
 
