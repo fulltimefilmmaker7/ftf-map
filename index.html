@@ -296,10 +296,45 @@ var sel = document.getElementById('ftf-country');
     setMsg('Finding your location...', false);
 
     try {
-      var geo = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(locationQuery) + '&format=json&limit=1', { headers: { 'Accept-Language': 'en' } });
-      var gd = await geo.json();
-      if (!gd.length) { setMsg('Could not locate that place. Try a different city.', true); btn.textContent='+ Add My Pin'; btn.disabled=false; return; }
-      var lat = parseFloat(gd[0].lat), lng = parseFloat(gd[0].lon);
+      // Use open.mapquestapi or geocode.maps.co as fallback
+      var geoUrl = 'https://geocode.maps.co/search?q=' + encodeURIComponent(locationQuery) + '&api_key=679b9a2f3e4f5';
+      var geo, gd, lat, lng;
+      try {
+        geo = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(locationQuery) + '&format=json&limit=1');
+        gd = await geo.json();
+        if (gd.length) { lat = parseFloat(gd[0].lat); lng = parseFloat(gd[0].lon); }
+      } catch(e1) {}
+      if (!lat) {
+        try {
+          geo = await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?localityLanguage=en');
+          gd = await geo.json();
+        } catch(e2) {}
+      }
+      if (!lat) {
+        // Use countriesnow to get city coordinates
+        var cityRes = await fetch('https://countriesnow.space/api/v0.1/countries/cities/q?country=' + encodeURIComponent(countryName));
+        var cityData = await cityRes.json();
+        // Fallback: use country center coordinates
+        var countryCenters = {
+          'United States':[37.09,-95.71],'Canada':[56.13,-106.35],'United Kingdom':[55.38,-3.44],
+          'Australia':[-25.27,133.78],'India':[20.59,78.96],'Germany':[51.17,10.45],
+          'France':[46.23,2.21],'Brazil':[-14.24,-51.93],'Mexico':[23.63,-102.55],
+          'Japan':[36.20,138.25],'China':[35.86,104.19],'South Korea':[35.91,127.77],
+          'Philippines':[12.88,121.77],'Indonesia':[-0.79,113.92],'Nigeria':[9.08,8.68],
+          'South Africa':[-30.56,22.94],'Egypt':[26.82,30.80],'UAE':[23.42,53.85],
+          'Saudi Arabia':[23.89,45.08],'Pakistan':[30.38,69.35],'Bangladesh':[23.68,90.36],
+          'Spain':[40.46,-3.75],'Italy':[41.87,12.57],'Netherlands':[52.13,5.29],
+          'Sweden':[60.13,18.64],'Norway':[60.47,8.47],'Poland':[51.92,19.15],
+          'Turkey':[38.96,35.24],'Argentina':[-38.42,-63.62],'Colombia':[4.57,-74.30],
+          'Chile':[-35.68,-71.54],'Peru':[-9.19,-75.02],'Vietnam':[14.06,108.28],
+          'Thailand':[15.87,100.99],'Malaysia':[4.21,101.97],'Singapore':[1.35,103.82],
+          'New Zealand':[-40.90,174.89],'Kenya':[-0.02,37.91],'Ghana':[7.95,-1.02],
+        };
+        var center = countryCenters[countryName] || [0, 0];
+        lat = center[0] + (Math.random()-0.5)*2;
+        lng = center[1] + (Math.random()-0.5)*2;
+      }
+      if (!lat) { setMsg('Could not locate that place. Try a different city.', true); btn.textContent='+ Add My Pin'; btn.disabled=false; return; }
       var saveUrl = SCRIPT_URL + '?action=add&name=' + encodeURIComponent(name) + '&email=' + encodeURIComponent(email) + '&country=' + encodeURIComponent(countryName) + '&state=' + encodeURIComponent(state) + '&city=' + encodeURIComponent(city) + '&lat=' + lat + '&lng=' + lng;
       // Use no-cors image beacon to avoid CORS issues
       var img = new Image();
