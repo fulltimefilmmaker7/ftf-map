@@ -12,6 +12,9 @@
   </div>
 
   <div id="ftf-map" style="width:100%;height:480px;"></div>
+  <div id="ftf-drag-hint" style="display:none;background:#1a1a1a;padding:8px 16px;text-align:center;font-size:12px;color:#C9A96E;border-top:1px solid #333;">
+    📍 Drag the pin to your exact location, then click <b>+ Add My Pin</b>
+  </div>
 
   <div style="background:#0a0a0a;padding:16px;border-top:1px solid #222;">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
@@ -66,14 +69,13 @@
   var BASE_MEMBERS = 32989;
   var BASE_COUNTRIES = 94;
   var countrySet = {};
+  var dragMarker = null; // the draggable preview pin
 
-  // --- HELPERS ---
   function setMsg(msg, err) {
     var el = document.getElementById('ftf-msg');
     el.textContent = msg;
     el.style.color = err ? '#ff6b6b' : '#C9A96E';
   }
-
   function getEl(id) { return document.getElementById(id); }
 
   // --- MAP ---
@@ -94,18 +96,19 @@
     bounds: [[-90,-180],[90,180]]
   }).addTo(map);
 
-  function makeIcon(gold) {
-    var size = gold ? 13 : 8;
-    var color = gold ? '#C9A96E' : '#c50000';
+  function makeIcon(gold, draggable) {
+    var size = draggable ? 18 : (gold ? 13 : 8);
+    var color = draggable ? '#ff6b00' : (gold ? '#C9A96E' : '#c50000');
+    var shadow = draggable ? '0 0 0 3px rgba(255,107,0,0.3)' : '0 0 4px rgba(0,0,0,0.5)';
     return L.divIcon({
       className: '',
-      html: '<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;background:'+color+';border:1.5px solid rgba(255,255,255,0.6);box-shadow:0 0 4px rgba(0,0,0,0.5);"></div>',
+      html: '<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;background:'+color+';border:2px solid #fff;box-shadow:'+shadow+';cursor:'+(draggable?'grab':'default')+';"></div>',
       iconSize: [size,size], iconAnchor: [size/2,size/2]
     });
   }
 
   function addMarker(name, city, country, lat, lng, gold) {
-    L.marker([lat,lng], {icon: makeIcon(gold)})
+    L.marker([lat,lng], {icon: makeIcon(gold, false)})
       .addTo(map)
       .bindPopup('<div style="font-family:sans-serif;"><b style="color:#fff;font-size:13px;">'+name+'</b><br><span style="color:#C9A96E;font-size:12px;">'+(city?city+', ':'')+country+'</span></div>');
     countrySet[country] = true;
@@ -116,19 +119,39 @@
     }
   }
 
-  // --- LOAD PINS FROM SHEET ---
+  // --- DRAGGABLE PREVIEW PIN ---
+  function placeDragPin(lat, lng) {
+    if (dragMarker) { map.removeLayer(dragMarker); }
+    dragMarker = L.marker([lat, lng], {
+      icon: makeIcon(false, true),
+      draggable: true,
+      zIndexOffset: 1000
+    }).addTo(map);
+    dragMarker.bindPopup('<span style="font-size:12px;color:#fff;">Drag me to your exact location</span>').openPopup();
+    dragMarker.on('dragend', function(e) {
+      var pos = e.target.getLatLng();
+      getEl('ftf-lat').value = pos.lat;
+      getEl('ftf-lng').value = pos.lng;
+    });
+    getEl('ftf-lat').value = lat;
+    getEl('ftf-lng').value = lng;
+    getEl('ftf-drag-hint').style.display = 'block';
+  }
+
+  // --- LOAD PINS ---
   fetch(SCRIPT_URL + '?action=get')
     .then(function(r){ return r.json(); })
     .then(function(rows){
       rows.forEach(function(r){
         addMarker(r.name, r.city, r.country, parseFloat(r.lat), parseFloat(r.lng), false);
+        countrySet[r.country] = true;
       });
       getEl('ftf-cnt').textContent = (BASE_MEMBERS + rows.length).toLocaleString();
       getEl('ftf-ctry').textContent = Math.max(BASE_COUNTRIES, Object.keys(countrySet).length);
     })
     .catch(function(){ console.warn('Could not load pins'); });
 
-  // --- COUNTRY DROPDOWN (hardcoded) ---
+  // --- COUNTRY DROPDOWN ---
   var countries = [
     ['AF','Afghanistan'],['AL','Albania'],['DZ','Algeria'],['AR','Argentina'],['AU','Australia'],
     ['AT','Austria'],['BD','Bangladesh'],['BE','Belgium'],['BR','Brazil'],['BG','Bulgaria'],
@@ -162,7 +185,7 @@
     csel.appendChild(o);
   });
 
-  // --- COUNTRY CHANGE ---
+  // --- COUNTRY CHANGE: zoom to country ---
   csel.addEventListener('change', function() {
     var cca2 = this.value;
     var stateSel = getEl('ftf-state');
@@ -173,12 +196,25 @@
     citySel.disabled = true;
     getEl('ftf-lat').value = '';
     getEl('ftf-lng').value = '';
+    getEl('ftf-drag-hint').style.display = 'none';
+    if (dragMarker) { map.removeLayer(dragMarker); dragMarker = null; }
     setMsg('', false);
     if (!cca2) return;
     var countryName = this.options[this.selectedIndex].getAttribute('data-name');
+
+    // Zoom to country
+    fetch('https://countriesnow.space/api/v0.1/countries/positions', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({country: countryName})
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.data) { map.flyTo([d.data.lat, d.data.long], 5, {duration: 1}); }
+    }).catch(function(){});
+
+    // Load states
     fetch('https://countriesnow.space/api/v0.1/countries/states', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({iso2: cca2})
     })
     .then(function(r){ return r.json(); })
@@ -192,17 +228,14 @@
         });
         stateSel.disabled = false;
       } else {
-        stateSel.innerHTML = '<option value="">No states — select city below</option>';
-        // Load cities directly if no states
+        stateSel.innerHTML = '<option value="">No states</option>';
         loadCitiesByCountry(countryName);
       }
     })
-    .catch(function(){
-      stateSel.innerHTML = '<option value="">Could not load states</option>';
-    });
+    .catch(function(){ stateSel.innerHTML = '<option value="">Could not load</option>'; });
   });
 
-  // --- STATE CHANGE ---
+  // --- STATE CHANGE: zoom to state area ---
   getEl('ftf-state').addEventListener('change', function() {
     var state = this.value;
     var countryEl = getEl('ftf-country');
@@ -212,11 +245,21 @@
     citySel.disabled = true;
     getEl('ftf-lat').value = '';
     getEl('ftf-lng').value = '';
+    if (dragMarker) { map.removeLayer(dragMarker); dragMarker = null; }
+    getEl('ftf-drag-hint').style.display = 'none';
     setMsg('', false);
     if (!state) return;
+
+    // Zoom to state
+    fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(state + ', ' + countryName) + '&format=json&limit=1', {headers:{'Accept-Language':'en'}})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.length) { map.flyTo([d[0].lat, d[0].lon], 7, {duration: 1}); }
+    }).catch(function(){});
+
+    // Load cities
     fetch('https://countriesnow.space/api/v0.1/countries/state/cities', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({country: countryName, state: state})
     })
     .then(function(r){ return r.json(); })
@@ -233,9 +276,7 @@
         citySel.innerHTML = '<option value="">No cities found</option>';
       }
     })
-    .catch(function(){
-      citySel.innerHTML = '<option value="">Could not load cities</option>';
-    });
+    .catch(function(){ citySel.innerHTML = '<option value="">Could not load</option>'; });
   });
 
   function loadCitiesByCountry(countryName) {
@@ -243,8 +284,7 @@
     citySel.innerHTML = '<option value="">Loading cities...</option>';
     citySel.disabled = true;
     fetch('https://countriesnow.space/api/v0.1/countries/cities', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({country: countryName})
     })
     .then(function(r){ return r.json(); })
@@ -261,7 +301,7 @@
     });
   }
 
-  // --- CITY CHANGE: geocode immediately ---
+  // --- CITY CHANGE: geocode + zoom + place draggable pin ---
   getEl('ftf-city').addEventListener('change', async function() {
     var city = this.value;
     if (!city) return;
@@ -271,26 +311,29 @@
     var state = getEl('ftf-state').value;
     getEl('ftf-lat').value = '';
     getEl('ftf-lng').value = '';
+    if (dragMarker) { map.removeLayer(dragMarker); dragMarker = null; }
+    getEl('ftf-drag-hint').style.display = 'none';
     setMsg('Locating ' + city + '...', false);
     try {
       var q = city + (state ? ', ' + state : '') + ', ' + countryName;
-      var geo = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(q) + '&format=json&limit=1&countrycodes=' + cc, {headers: {'Accept-Language':'en'}});
+      var geo = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(q) + '&format=json&limit=1&countrycodes=' + cc, {headers:{'Accept-Language':'en'}});
       var gd = await geo.json();
       if (gd.length) {
-        getEl('ftf-lat').value = gd[0].lat;
-        getEl('ftf-lng').value = gd[0].lon;
-        setMsg('✓ Located: ' + city + ', ' + countryName, false);
+        var lat = parseFloat(gd[0].lat);
+        var lng = parseFloat(gd[0].lon);
+        map.flyTo([lat, lng], 12, {duration: 1.2});
+        placeDragPin(lat, lng);
+        setMsg('✓ Drag the orange pin to your exact spot', false);
       } else {
-        // fallback: country center from countriesnow
         var pos = await fetch('https://countriesnow.space/api/v0.1/countries/positions', {
-          method: 'POST', headers: {'Content-Type':'application/json'},
+          method:'POST', headers:{'Content-Type':'application/json'},
           body: JSON.stringify({country: countryName})
         });
         var pd = await pos.json();
         if (pd.data) {
-          getEl('ftf-lat').value = pd.data.lat;
-          getEl('ftf-lng').value = pd.data.long;
-          setMsg('✓ Located: ' + countryName, false);
+          map.flyTo([pd.data.lat, pd.data.long], 6, {duration: 1});
+          placeDragPin(pd.data.lat, pd.data.long);
+          setMsg('✓ Drag the orange pin to your exact location', false);
         } else {
           setMsg('Could not locate city. Try another.', true);
         }
@@ -315,7 +358,7 @@
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setMsg('Please enter a valid email.', true); return; }
     if (!countryName) { setMsg('Please select your country.', true); return; }
     if (!city) { setMsg('Please select your city.', true); return; }
-    if (!lat || !lng) { setMsg('Location not found yet. Wait a moment and try again.', true); return; }
+    if (!lat || !lng) { setMsg('Please wait for location to load.', true); return; }
 
     var btn = getEl('ftf-btn');
     btn.textContent = 'Saving...';
@@ -329,8 +372,7 @@
         '&country=' + encodeURIComponent(countryName) +
         '&state=' + encodeURIComponent(state) +
         '&city=' + encodeURIComponent(city) +
-        '&lat=' + lat +
-        '&lng=' + lng;
+        '&lat=' + lat + '&lng=' + lng;
 
       var ifrm = document.createElement('iframe');
       ifrm.style.display = 'none';
@@ -339,8 +381,10 @@
       await new Promise(function(resolve){ setTimeout(resolve, 2000); });
       document.body.removeChild(ifrm);
 
+      if (dragMarker) { map.removeLayer(dragMarker); dragMarker = null; }
+      getEl('ftf-drag-hint').style.display = 'none';
       addMarker(name, city, countryName, lat, lng, true);
-      map.flyTo([lat, lng], 5, {duration: 1.2});
+      map.flyTo([lat, lng], 10, {duration: 1});
       setMsg('Your pin has been added! Welcome to the FTF world map!', false);
 
       getEl('ftf-name').value = '';
@@ -355,7 +399,6 @@
     } catch(e) {
       setMsg('Something went wrong. Please try again.', true);
     }
-
     btn.textContent = '+ Add My Pin';
     btn.disabled = false;
   };
