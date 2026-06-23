@@ -240,6 +240,12 @@ var sel = document.getElementById('ftf-country');
 
 
   window.ftfLoadStates = function() {
+    // Reset coords whenever country changes
+    document.getElementById('ftf-lat').value = '';
+    document.getElementById('ftf-lng').value = '';
+    document.getElementById('ftf-city').innerHTML = '<option value="">Select city...</option>';
+    document.getElementById('ftf-city').disabled = true;
+    setMsg('', false);
     var cca2 = document.getElementById('ftf-country').value;
     var stateSel = document.getElementById('ftf-state');
     var citySel = document.getElementById('ftf-city');
@@ -295,6 +301,45 @@ var sel = document.getElementById('ftf-country');
       }
     });
   };
+
+  // Geocode as soon as city is picked — store lat/lng immediately
+  document.getElementById('ftf-city').addEventListener('change', async function() {
+    var city = this.value;
+    if (!city) return;
+    var countryEl = document.getElementById('ftf-country');
+    var countryName = countryEl.options[countryEl.selectedIndex].getAttribute('data-name');
+    var state = document.getElementById('ftf-state').value;
+    var cc = countryEl.value.toLowerCase();
+    document.getElementById('ftf-lat').value = '';
+    document.getElementById('ftf-lng').value = '';
+    setMsg('Locating ' + city + '...', false);
+    try {
+      var q = city + ', ' + (state ? state + ', ' : '') + countryName;
+      var geo = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(q) + '&format=json&limit=1&countrycodes=' + cc, { headers: { 'Accept-Language': 'en' } });
+      var gd = await geo.json();
+      if (gd.length) {
+        document.getElementById('ftf-lat').value = gd[0].lat;
+        document.getElementById('ftf-lng').value = gd[0].lon;
+        setMsg('✓ Located: ' + city + ', ' + countryName, false);
+      } else {
+        // fallback — country position API
+        var posRes = await fetch('https://countriesnow.space/api/v0.1/countries/positions', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ country: countryName })
+        });
+        var posData = await posRes.json();
+        if (posData.data) {
+          document.getElementById('ftf-lat').value = posData.data.lat;
+          document.getElementById('ftf-lng').value = posData.data.long;
+          setMsg('✓ Located: ' + countryName, false);
+        } else {
+          setMsg('Could not locate city. Try selecting again.', true);
+        }
+      }
+    } catch(e) {
+      setMsg('Location lookup failed. Please try again.', true);
+    }
+  });
 
   function setMsg(msg, err) {
     var el = document.getElementById('ftf-msg');
