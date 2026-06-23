@@ -16,34 +16,36 @@
   <div style="background:#0a0a0a;padding:16px;border-top:1px solid #222;">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
       <div>
-        <label style="display:block;font-size:11px;color:#777;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">Your Name *</label>
+        <div style="font-size:11px;color:#777;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">Your Name *</div>
         <input id="ftf-name" placeholder="Full name" style="width:100%;background:#161616;border:1px solid #333;border-radius:6px;padding:9px 12px;font-size:13px;color:#fff;outline:none;box-sizing:border-box;">
       </div>
       <div>
-        <label style="display:block;font-size:11px;color:#777;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">Email Address *</label>
+        <div style="font-size:11px;color:#777;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">Email Address *</div>
         <input id="ftf-email" type="email" placeholder="you@email.com" style="width:100%;background:#161616;border:1px solid #333;border-radius:6px;padding:9px 12px;font-size:13px;color:#fff;outline:none;box-sizing:border-box;">
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
       <div>
-        <label style="display:block;font-size:11px;color:#777;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">Country *</label>
-        <select id="ftf-country" onchange="ftfLoadStates()" style="width:100%;background:#161616;border:1px solid #333;border-radius:6px;padding:9px 12px;font-size:13px;color:#fff;outline:none;box-sizing:border-box;">
+        <div style="font-size:11px;color:#777;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">Country *</div>
+        <select id="ftf-country" style="width:100%;background:#161616;border:1px solid #333;border-radius:6px;padding:9px 12px;font-size:13px;color:#fff;outline:none;box-sizing:border-box;">
           <option value="">Select country...</option>
         </select>
       </div>
       <div>
-        <label style="display:block;font-size:11px;color:#777;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">State / Region</label>
-        <select id="ftf-state" onchange="ftfLoadCities()" style="width:100%;background:#161616;border:1px solid #333;border-radius:6px;padding:9px 12px;font-size:13px;color:#fff;outline:none;box-sizing:border-box;" disabled>
+        <div style="font-size:11px;color:#777;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">State / Region</div>
+        <select id="ftf-state" style="width:100%;background:#161616;border:1px solid #333;border-radius:6px;padding:9px 12px;font-size:13px;color:#fff;outline:none;box-sizing:border-box;" disabled>
           <option value="">Select state...</option>
         </select>
       </div>
       <div>
-        <label style="display:block;font-size:11px;color:#777;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">City</label>
+        <div style="font-size:11px;color:#777;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">City *</div>
         <select id="ftf-city" style="width:100%;background:#161616;border:1px solid #333;border-radius:6px;padding:9px 12px;font-size:13px;color:#fff;outline:none;box-sizing:border-box;" disabled>
           <option value="">Select city...</option>
         </select>
       </div>
     </div>
+    <input type="hidden" id="ftf-lat" value="">
+    <input type="hidden" id="ftf-lng" value="">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
       <p id="ftf-msg" style="font-size:12px;color:#C9A96E;margin:0;min-height:16px;"></p>
       <button id="ftf-btn" onclick="ftfAddPin()" style="background:#c50000;border:none;border-radius:6px;padding:10px 24px;font-size:13px;color:#fff;font-weight:600;cursor:pointer;white-space:nowrap;">+ Add My Pin</button>
@@ -61,14 +63,25 @@
 <script>
 (function() {
   var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw8WU2vObMNnzM9K1oBk1JzlezvNgRQ98BIVGM9SzxcdYpCim2pAV-TQArizDshzJtBNw/exec';
-  var pinCount = 32989;
+  var BASE_MEMBERS = 32989;
+  var BASE_COUNTRIES = 94;
   var countrySet = {};
 
+  // --- HELPERS ---
+  function setMsg(msg, err) {
+    var el = document.getElementById('ftf-msg');
+    el.textContent = msg;
+    el.style.color = err ? '#ff6b6b' : '#C9A96E';
+  }
+
+  function getEl(id) { return document.getElementById(id); }
+
+  // --- MAP ---
   var map = L.map('ftf-map', {
     zoomControl: true,
     scrollWheelZoom: false,
     worldCopyJump: false,
-    maxBounds: [[-90, -180], [90, 180]],
+    maxBounds: [[-90,-180],[90,180]],
     maxBoundsViscosity: 1.0,
     minZoom: 2
   }).setView([20, 10], 2);
@@ -78,7 +91,7 @@
     subdomains: 'abcd',
     maxZoom: 19,
     noWrap: true,
-    bounds: [[-90, -180], [90, 180]]
+    bounds: [[-90,-180],[90,180]]
   }).addTo(map);
 
   function makeIcon(gold) {
@@ -86,162 +99,87 @@
     var color = gold ? '#C9A96E' : '#c50000';
     return L.divIcon({
       className: '',
-      html: '<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;background:'+color+';border:1.5px solid rgba(255,255,255,0.5);box-shadow:0 0 4px rgba(0,0,0,0.6);"></div>',
-      iconSize: [size, size],
-      iconAnchor: [size/2, size/2]
+      html: '<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;background:'+color+';border:1.5px solid rgba(255,255,255,0.6);box-shadow:0 0 4px rgba(0,0,0,0.5);"></div>',
+      iconSize: [size,size], iconAnchor: [size/2,size/2]
     });
   }
 
   function addMarker(name, city, country, lat, lng, gold) {
-    L.marker([lat, lng], { icon: makeIcon(gold) })
+    L.marker([lat,lng], {icon: makeIcon(gold)})
       .addTo(map)
       .bindPopup('<div style="font-family:sans-serif;"><b style="color:#fff;font-size:13px;">'+name+'</b><br><span style="color:#C9A96E;font-size:12px;">'+(city?city+', ':'')+country+'</span></div>');
     countrySet[country] = true;
     if (gold) {
-      // New pin added — increment live counts
-      var currentCount = parseInt(document.getElementById('ftf-cnt').textContent.replace(/,/g,'')) || BASE_MEMBERS;
-      document.getElementById('ftf-cnt').textContent = (currentCount + 1).toLocaleString();
-      var currentCtry = parseInt(document.getElementById('ftf-ctry').textContent) || BASE_COUNTRIES;
-      document.getElementById('ftf-ctry').textContent = Math.max(currentCtry, Object.keys(countrySet).length);
+      var c = parseInt(getEl('ftf-cnt').textContent.replace(/,/g,'')) || BASE_MEMBERS;
+      getEl('ftf-cnt').textContent = (c+1).toLocaleString();
+      getEl('ftf-ctry').textContent = Math.max(parseInt(getEl('ftf-ctry').textContent)||BASE_COUNTRIES, Object.keys(countrySet).length);
     }
   }
 
-  function loadPins() {
-    fetch(SCRIPT_URL + '?action=get')
-      .then(function(r){ return r.json(); })
-      .then(function(rows){
-        rows.forEach(function(r){
-          addMarker(r.name, r.city, r.country, parseFloat(r.lat), parseFloat(r.lng), false);
-        });
-      })
-      .catch(function(){ console.warn('FTF map: could not load pins'); });
-  }
-  loadPins();
+  // --- LOAD PINS FROM SHEET ---
+  fetch(SCRIPT_URL + '?action=get')
+    .then(function(r){ return r.json(); })
+    .then(function(rows){
+      rows.forEach(function(r){
+        addMarker(r.name, r.city, r.country, parseFloat(r.lat), parseFloat(r.lng), false);
+      });
+      getEl('ftf-cnt').textContent = (BASE_MEMBERS + rows.length).toLocaleString();
+      getEl('ftf-ctry').textContent = Math.max(BASE_COUNTRIES, Object.keys(countrySet).length);
+    })
+    .catch(function(){ console.warn('Could not load pins'); });
 
-var sel = document.getElementById('ftf-country');
-  var o=document.createElement('option');o.value='AF';o.textContent='Afghanistan';o.setAttribute('data-name','Afghanistan');sel.appendChild(o);
-  var o=document.createElement('option');o.value='AL';o.textContent='Albania';o.setAttribute('data-name','Albania');sel.appendChild(o);
-  var o=document.createElement('option');o.value='DZ';o.textContent='Algeria';o.setAttribute('data-name','Algeria');sel.appendChild(o);
-  var o=document.createElement('option');o.value='AO';o.textContent='Angola';o.setAttribute('data-name','Angola');sel.appendChild(o);
-  var o=document.createElement('option');o.value='AR';o.textContent='Argentina';o.setAttribute('data-name','Argentina');sel.appendChild(o);
-  var o=document.createElement('option');o.value='AU';o.textContent='Australia';o.setAttribute('data-name','Australia');sel.appendChild(o);
-  var o=document.createElement('option');o.value='AT';o.textContent='Austria';o.setAttribute('data-name','Austria');sel.appendChild(o);
-  var o=document.createElement('option');o.value='BD';o.textContent='Bangladesh';o.setAttribute('data-name','Bangladesh');sel.appendChild(o);
-  var o=document.createElement('option');o.value='BE';o.textContent='Belgium';o.setAttribute('data-name','Belgium');sel.appendChild(o);
-  var o=document.createElement('option');o.value='BO';o.textContent='Bolivia';o.setAttribute('data-name','Bolivia');sel.appendChild(o);
-  var o=document.createElement('option');o.value='BW';o.textContent='Botswana';o.setAttribute('data-name','Botswana');sel.appendChild(o);
-  var o=document.createElement('option');o.value='BR';o.textContent='Brazil';o.setAttribute('data-name','Brazil');sel.appendChild(o);
-  var o=document.createElement('option');o.value='BG';o.textContent='Bulgaria';o.setAttribute('data-name','Bulgaria');sel.appendChild(o);
-  var o=document.createElement('option');o.value='CM';o.textContent='Cameroon';o.setAttribute('data-name','Cameroon');sel.appendChild(o);
-  var o=document.createElement('option');o.value='CA';o.textContent='Canada';o.setAttribute('data-name','Canada');sel.appendChild(o);
-  var o=document.createElement('option');o.value='CL';o.textContent='Chile';o.setAttribute('data-name','Chile');sel.appendChild(o);
-  var o=document.createElement('option');o.value='CN';o.textContent='China';o.setAttribute('data-name','China');sel.appendChild(o);
-  var o=document.createElement('option');o.value='CO';o.textContent='Colombia';o.setAttribute('data-name','Colombia');sel.appendChild(o);
-  var o=document.createElement('option');o.value='CR';o.textContent='Costa Rica';o.setAttribute('data-name','Costa Rica');sel.appendChild(o);
-  var o=document.createElement('option');o.value='HR';o.textContent='Croatia';o.setAttribute('data-name','Croatia');sel.appendChild(o);
-  var o=document.createElement('option');o.value='CU';o.textContent='Cuba';o.setAttribute('data-name','Cuba');sel.appendChild(o);
-  var o=document.createElement('option');o.value='CZ';o.textContent='Czech Republic';o.setAttribute('data-name','Czech Republic');sel.appendChild(o);
-  var o=document.createElement('option');o.value='DK';o.textContent='Denmark';o.setAttribute('data-name','Denmark');sel.appendChild(o);
-  var o=document.createElement('option');o.value='DO';o.textContent='Dominican Republic';o.setAttribute('data-name','Dominican Republic');sel.appendChild(o);
-  var o=document.createElement('option');o.value='EC';o.textContent='Ecuador';o.setAttribute('data-name','Ecuador');sel.appendChild(o);
-  var o=document.createElement('option');o.value='EG';o.textContent='Egypt';o.setAttribute('data-name','Egypt');sel.appendChild(o);
-  var o=document.createElement('option');o.value='SV';o.textContent='El Salvador';o.setAttribute('data-name','El Salvador');sel.appendChild(o);
-  var o=document.createElement('option');o.value='EE';o.textContent='Estonia';o.setAttribute('data-name','Estonia');sel.appendChild(o);
-  var o=document.createElement('option');o.value='ET';o.textContent='Ethiopia';o.setAttribute('data-name','Ethiopia');sel.appendChild(o);
-  var o=document.createElement('option');o.value='FI';o.textContent='Finland';o.setAttribute('data-name','Finland');sel.appendChild(o);
-  var o=document.createElement('option');o.value='FR';o.textContent='France';o.setAttribute('data-name','France');sel.appendChild(o);
-  var o=document.createElement('option');o.value='DE';o.textContent='Germany';o.setAttribute('data-name','Germany');sel.appendChild(o);
-  var o=document.createElement('option');o.value='GH';o.textContent='Ghana';o.setAttribute('data-name','Ghana');sel.appendChild(o);
-  var o=document.createElement('option');o.value='GR';o.textContent='Greece';o.setAttribute('data-name','Greece');sel.appendChild(o);
-  var o=document.createElement('option');o.value='GT';o.textContent='Guatemala';o.setAttribute('data-name','Guatemala');sel.appendChild(o);
-  var o=document.createElement('option');o.value='HN';o.textContent='Honduras';o.setAttribute('data-name','Honduras');sel.appendChild(o);
-  var o=document.createElement('option');o.value='HU';o.textContent='Hungary';o.setAttribute('data-name','Hungary');sel.appendChild(o);
-  var o=document.createElement('option');o.value='IN';o.textContent='India';o.setAttribute('data-name','India');sel.appendChild(o);
-  var o=document.createElement('option');o.value='ID';o.textContent='Indonesia';o.setAttribute('data-name','Indonesia');sel.appendChild(o);
-  var o=document.createElement('option');o.value='IE';o.textContent='Ireland';o.setAttribute('data-name','Ireland');sel.appendChild(o);
-  var o=document.createElement('option');o.value='IL';o.textContent='Israel';o.setAttribute('data-name','Israel');sel.appendChild(o);
-  var o=document.createElement('option');o.value='IT';o.textContent='Italy';o.setAttribute('data-name','Italy');sel.appendChild(o);
-  var o=document.createElement('option');o.value='CI';o.textContent='Ivory Coast';o.setAttribute('data-name','Ivory Coast');sel.appendChild(o);
-  var o=document.createElement('option');o.value='JM';o.textContent='Jamaica';o.setAttribute('data-name','Jamaica');sel.appendChild(o);
-  var o=document.createElement('option');o.value='JP';o.textContent='Japan';o.setAttribute('data-name','Japan');sel.appendChild(o);
-  var o=document.createElement('option');o.value='JO';o.textContent='Jordan';o.setAttribute('data-name','Jordan');sel.appendChild(o);
-  var o=document.createElement('option');o.value='KZ';o.textContent='Kazakhstan';o.setAttribute('data-name','Kazakhstan');sel.appendChild(o);
-  var o=document.createElement('option');o.value='KE';o.textContent='Kenya';o.setAttribute('data-name','Kenya');sel.appendChild(o);
-  var o=document.createElement('option');o.value='KW';o.textContent='Kuwait';o.setAttribute('data-name','Kuwait');sel.appendChild(o);
-  var o=document.createElement('option');o.value='LV';o.textContent='Latvia';o.setAttribute('data-name','Latvia');sel.appendChild(o);
-  var o=document.createElement('option');o.value='LB';o.textContent='Lebanon';o.setAttribute('data-name','Lebanon');sel.appendChild(o);
-  var o=document.createElement('option');o.value='LT';o.textContent='Lithuania';o.setAttribute('data-name','Lithuania');sel.appendChild(o);
-  var o=document.createElement('option');o.value='MG';o.textContent='Madagascar';o.setAttribute('data-name','Madagascar');sel.appendChild(o);
-  var o=document.createElement('option');o.value='MY';o.textContent='Malaysia';o.setAttribute('data-name','Malaysia');sel.appendChild(o);
-  var o=document.createElement('option');o.value='MX';o.textContent='Mexico';o.setAttribute('data-name','Mexico');sel.appendChild(o);
-  var o=document.createElement('option');o.value='MA';o.textContent='Morocco';o.setAttribute('data-name','Morocco');sel.appendChild(o);
-  var o=document.createElement('option');o.value='MZ';o.textContent='Mozambique';o.setAttribute('data-name','Mozambique');sel.appendChild(o);
-  var o=document.createElement('option');o.value='MM';o.textContent='Myanmar';o.setAttribute('data-name','Myanmar');sel.appendChild(o);
-  var o=document.createElement('option');o.value='NA';o.textContent='Namibia';o.setAttribute('data-name','Namibia');sel.appendChild(o);
-  var o=document.createElement('option');o.value='NP';o.textContent='Nepal';o.setAttribute('data-name','Nepal');sel.appendChild(o);
-  var o=document.createElement('option');o.value='NL';o.textContent='Netherlands';o.setAttribute('data-name','Netherlands');sel.appendChild(o);
-  var o=document.createElement('option');o.value='NZ';o.textContent='New Zealand';o.setAttribute('data-name','New Zealand');sel.appendChild(o);
-  var o=document.createElement('option');o.value='NG';o.textContent='Nigeria';o.setAttribute('data-name','Nigeria');sel.appendChild(o);
-  var o=document.createElement('option');o.value='NO';o.textContent='Norway';o.setAttribute('data-name','Norway');sel.appendChild(o);
-  var o=document.createElement('option');o.value='PK';o.textContent='Pakistan';o.setAttribute('data-name','Pakistan');sel.appendChild(o);
-  var o=document.createElement('option');o.value='PA';o.textContent='Panama';o.setAttribute('data-name','Panama');sel.appendChild(o);
-  var o=document.createElement('option');o.value='PY';o.textContent='Paraguay';o.setAttribute('data-name','Paraguay');sel.appendChild(o);
-  var o=document.createElement('option');o.value='PE';o.textContent='Peru';o.setAttribute('data-name','Peru');sel.appendChild(o);
-  var o=document.createElement('option');o.value='PH';o.textContent='Philippines';o.setAttribute('data-name','Philippines');sel.appendChild(o);
-  var o=document.createElement('option');o.value='PL';o.textContent='Poland';o.setAttribute('data-name','Poland');sel.appendChild(o);
-  var o=document.createElement('option');o.value='PT';o.textContent='Portugal';o.setAttribute('data-name','Portugal');sel.appendChild(o);
-  var o=document.createElement('option');o.value='QA';o.textContent='Qatar';o.setAttribute('data-name','Qatar');sel.appendChild(o);
-  var o=document.createElement('option');o.value='RO';o.textContent='Romania';o.setAttribute('data-name','Romania');sel.appendChild(o);
-  var o=document.createElement('option');o.value='RU';o.textContent='Russia';o.setAttribute('data-name','Russia');sel.appendChild(o);
-  var o=document.createElement('option');o.value='SA';o.textContent='Saudi Arabia';o.setAttribute('data-name','Saudi Arabia');sel.appendChild(o);
-  var o=document.createElement('option');o.value='SN';o.textContent='Senegal';o.setAttribute('data-name','Senegal');sel.appendChild(o);
-  var o=document.createElement('option');o.value='RS';o.textContent='Serbia';o.setAttribute('data-name','Serbia');sel.appendChild(o);
-  var o=document.createElement('option');o.value='SG';o.textContent='Singapore';o.setAttribute('data-name','Singapore');sel.appendChild(o);
-  var o=document.createElement('option');o.value='SK';o.textContent='Slovakia';o.setAttribute('data-name','Slovakia');sel.appendChild(o);
-  var o=document.createElement('option');o.value='ZA';o.textContent='South Africa';o.setAttribute('data-name','South Africa');sel.appendChild(o);
-  var o=document.createElement('option');o.value='KR';o.textContent='South Korea';o.setAttribute('data-name','South Korea');sel.appendChild(o);
-  var o=document.createElement('option');o.value='ES';o.textContent='Spain';o.setAttribute('data-name','Spain');sel.appendChild(o);
-  var o=document.createElement('option');o.value='LK';o.textContent='Sri Lanka';o.setAttribute('data-name','Sri Lanka');sel.appendChild(o);
-  var o=document.createElement('option');o.value='SE';o.textContent='Sweden';o.setAttribute('data-name','Sweden');sel.appendChild(o);
-  var o=document.createElement('option');o.value='CH';o.textContent='Switzerland';o.setAttribute('data-name','Switzerland');sel.appendChild(o);
-  var o=document.createElement('option');o.value='TW';o.textContent='Taiwan';o.setAttribute('data-name','Taiwan');sel.appendChild(o);
-  var o=document.createElement('option');o.value='TZ';o.textContent='Tanzania';o.setAttribute('data-name','Tanzania');sel.appendChild(o);
-  var o=document.createElement('option');o.value='TH';o.textContent='Thailand';o.setAttribute('data-name','Thailand');sel.appendChild(o);
-  var o=document.createElement('option');o.value='TT';o.textContent='Trinidad and Tobago';o.setAttribute('data-name','Trinidad and Tobago');sel.appendChild(o);
-  var o=document.createElement('option');o.value='TN';o.textContent='Tunisia';o.setAttribute('data-name','Tunisia');sel.appendChild(o);
-  var o=document.createElement('option');o.value='TR';o.textContent='Turkey';o.setAttribute('data-name','Turkey');sel.appendChild(o);
-  var o=document.createElement('option');o.value='AE';o.textContent='UAE';o.setAttribute('data-name','UAE');sel.appendChild(o);
-  var o=document.createElement('option');o.value='UG';o.textContent='Uganda';o.setAttribute('data-name','Uganda');sel.appendChild(o);
-  var o=document.createElement('option');o.value='UA';o.textContent='Ukraine';o.setAttribute('data-name','Ukraine');sel.appendChild(o);
-  var o=document.createElement('option');o.value='GB';o.textContent='United Kingdom';o.setAttribute('data-name','United Kingdom');sel.appendChild(o);
-  var o=document.createElement('option');o.value='US';o.textContent='United States';o.setAttribute('data-name','United States');sel.appendChild(o);
-  var o=document.createElement('option');o.value='UY';o.textContent='Uruguay';o.setAttribute('data-name','Uruguay');sel.appendChild(o);
-  var o=document.createElement('option');o.value='UZ';o.textContent='Uzbekistan';o.setAttribute('data-name','Uzbekistan');sel.appendChild(o);
-  var o=document.createElement('option');o.value='VE';o.textContent='Venezuela';o.setAttribute('data-name','Venezuela');sel.appendChild(o);
-  var o=document.createElement('option');o.value='VN';o.textContent='Vietnam';o.setAttribute('data-name','Vietnam');sel.appendChild(o);
-  var o=document.createElement('option');o.value='YE';o.textContent='Yemen';o.setAttribute('data-name','Yemen');sel.appendChild(o);
-  var o=document.createElement('option');o.value='ZM';o.textContent='Zambia';o.setAttribute('data-name','Zambia');sel.appendChild(o);
-  var o=document.createElement('option');o.value='ZW';o.textContent='Zimbabwe';o.setAttribute('data-name','Zimbabwe');sel.appendChild(o);
+  // --- COUNTRY DROPDOWN (hardcoded) ---
+  var countries = [
+    ['AF','Afghanistan'],['AL','Albania'],['DZ','Algeria'],['AR','Argentina'],['AU','Australia'],
+    ['AT','Austria'],['BD','Bangladesh'],['BE','Belgium'],['BR','Brazil'],['BG','Bulgaria'],
+    ['CA','Canada'],['CL','Chile'],['CN','China'],['CO','Colombia'],['HR','Croatia'],
+    ['CZ','Czech Republic'],['DK','Denmark'],['EG','Egypt'],['EE','Estonia'],['FI','Finland'],
+    ['FR','France'],['DE','Germany'],['GH','Ghana'],['GR','Greece'],['HU','Hungary'],
+    ['IN','India'],['ID','Indonesia'],['IE','Ireland'],['IL','Israel'],['IT','Italy'],
+    ['JP','Japan'],['JO','Jordan'],['KE','Kenya'],['KR','South Korea'],['KW','Kuwait'],
+    ['LB','Lebanon'],['LT','Lithuania'],['LV','Latvia'],['MY','Malaysia'],['MX','Mexico'],
+    ['MA','Morocco'],['NL','Netherlands'],['NZ','New Zealand'],['NG','Nigeria'],['NO','Norway'],
+    ['PK','Pakistan'],['PE','Peru'],['PH','Philippines'],['PL','Poland'],['PT','Portugal'],
+    ['QA','Qatar'],['RO','Romania'],['RU','Russia'],['SA','Saudi Arabia'],['RS','Serbia'],
+    ['SG','Singapore'],['SK','Slovakia'],['ZA','South Africa'],['ES','Spain'],['LK','Sri Lanka'],
+    ['SE','Sweden'],['CH','Switzerland'],['TW','Taiwan'],['TH','Thailand'],['TN','Tunisia'],
+    ['TR','Turkey'],['UA','Ukraine'],['AE','UAE'],['GB','United Kingdom'],['US','United States'],
+    ['UY','Uruguay'],['VN','Vietnam'],['YE','Yemen'],['ZM','Zambia'],['ZW','Zimbabwe'],
+    ['NP','Nepal'],['MM','Myanmar'],['KZ','Kazakhstan'],['UZ','Uzbekistan'],['EC','Ecuador'],
+    ['BO','Bolivia'],['PY','Paraguay'],['VE','Venezuela'],['CR','Costa Rica'],['PA','Panama'],
+    ['GT','Guatemala'],['HN','Honduras'],['SV','El Salvador'],['DO','Dominican Republic'],
+    ['CU','Cuba'],['JM','Jamaica'],['TT','Trinidad and Tobago'],['CI','Ivory Coast'],
+    ['CM','Cameroon'],['SN','Senegal'],['ET','Ethiopia'],['TZ','Tanzania'],['UG','Uganda'],
+    ['MZ','Mozambique'],['AO','Angola'],['MG','Madagascar'],['NA','Namibia'],['BW','Botswana'],
+    ['IS','Iceland'],['LU','Luxembourg'],['MT','Malta'],['CY','Cyprus'],['FJ','Fiji'],
+    ['GE','Georgia'],['AM','Armenia'],['AZ','Azerbaijan'],['BH','Bahrain'],['OM','Oman'],
+  ];
+  countries.sort(function(a,b){ return a[1].localeCompare(b[1]); });
+  var csel = getEl('ftf-country');
+  countries.forEach(function(c){
+    var o = document.createElement('option');
+    o.value = c[0]; o.textContent = c[1]; o.setAttribute('data-name', c[1]);
+    csel.appendChild(o);
+  });
 
-
-  window.ftfLoadStates = function() {
-    // Reset coords whenever country changes
-    document.getElementById('ftf-lat').value = '';
-    document.getElementById('ftf-lng').value = '';
-    document.getElementById('ftf-city').innerHTML = '<option value="">Select city...</option>';
-    document.getElementById('ftf-city').disabled = true;
-    setMsg('', false);
-    var cca2 = document.getElementById('ftf-country').value;
-    var stateSel = document.getElementById('ftf-state');
-    var citySel = document.getElementById('ftf-city');
-    stateSel.innerHTML = '<option value="">Loading...</option>';
+  // --- COUNTRY CHANGE ---
+  csel.addEventListener('change', function() {
+    var cca2 = this.value;
+    var stateSel = getEl('ftf-state');
+    var citySel = getEl('ftf-city');
+    stateSel.innerHTML = '<option value="">Loading states...</option>';
     stateSel.disabled = true;
     citySel.innerHTML = '<option value="">Select city...</option>';
     citySel.disabled = true;
+    getEl('ftf-lat').value = '';
+    getEl('ftf-lng').value = '';
+    setMsg('', false);
     if (!cca2) return;
+    var countryName = this.options[this.selectedIndex].getAttribute('data-name');
     fetch('https://countriesnow.space/api/v0.1/countries/states', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ iso2: cca2 })
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({iso2: cca2})
     })
     .then(function(r){ return r.json(); })
     .then(function(d){
@@ -254,22 +192,32 @@ var sel = document.getElementById('ftf-country');
         });
         stateSel.disabled = false;
       } else {
-        stateSel.innerHTML = '<option value="">No states available</option>';
+        stateSel.innerHTML = '<option value="">No states — select city below</option>';
+        // Load cities directly if no states
+        loadCitiesByCountry(countryName);
       }
+    })
+    .catch(function(){
+      stateSel.innerHTML = '<option value="">Could not load states</option>';
     });
-  };
+  });
 
-  window.ftfLoadCities = function() {
-    var countryEl = document.getElementById('ftf-country');
+  // --- STATE CHANGE ---
+  getEl('ftf-state').addEventListener('change', function() {
+    var state = this.value;
+    var countryEl = getEl('ftf-country');
     var countryName = countryEl.options[countryEl.selectedIndex].getAttribute('data-name');
-    var state = document.getElementById('ftf-state').value;
-    var citySel = document.getElementById('ftf-city');
-    citySel.innerHTML = '<option value="">Loading...</option>';
+    var citySel = getEl('ftf-city');
+    citySel.innerHTML = '<option value="">Loading cities...</option>';
     citySel.disabled = true;
+    getEl('ftf-lat').value = '';
+    getEl('ftf-lng').value = '';
+    setMsg('', false);
     if (!state) return;
     fetch('https://countriesnow.space/api/v0.1/countries/state/cities', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ country: countryName, state: state })
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({country: countryName, state: state})
     })
     .then(function(r){ return r.json(); })
     .then(function(d){
@@ -284,134 +232,130 @@ var sel = document.getElementById('ftf-country');
       } else {
         citySel.innerHTML = '<option value="">No cities found</option>';
       }
+    })
+    .catch(function(){
+      citySel.innerHTML = '<option value="">Could not load cities</option>';
     });
-  };
+  });
 
-  // Geocode as soon as city is picked — store lat/lng immediately
-  document.getElementById('ftf-city').addEventListener('change', async function() {
+  function loadCitiesByCountry(countryName) {
+    var citySel = getEl('ftf-city');
+    citySel.innerHTML = '<option value="">Loading cities...</option>';
+    citySel.disabled = true;
+    fetch('https://countriesnow.space/api/v0.1/countries/cities', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({country: countryName})
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      citySel.innerHTML = '<option value="">Select city...</option>';
+      if (d.data && d.data.length) {
+        d.data.forEach(function(city){
+          var o = document.createElement('option');
+          o.value = city; o.textContent = city;
+          citySel.appendChild(o);
+        });
+        citySel.disabled = false;
+      }
+    });
+  }
+
+  // --- CITY CHANGE: geocode immediately ---
+  getEl('ftf-city').addEventListener('change', async function() {
     var city = this.value;
     if (!city) return;
-    var countryEl = document.getElementById('ftf-country');
+    var countryEl = getEl('ftf-country');
     var countryName = countryEl.options[countryEl.selectedIndex].getAttribute('data-name');
-    var state = document.getElementById('ftf-state').value;
     var cc = countryEl.value.toLowerCase();
-    document.getElementById('ftf-lat').value = '';
-    document.getElementById('ftf-lng').value = '';
+    var state = getEl('ftf-state').value;
+    getEl('ftf-lat').value = '';
+    getEl('ftf-lng').value = '';
     setMsg('Locating ' + city + '...', false);
     try {
-      var q = city + ', ' + (state ? state + ', ' : '') + countryName;
-      var geo = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(q) + '&format=json&limit=1&countrycodes=' + cc, { headers: { 'Accept-Language': 'en' } });
+      var q = city + (state ? ', ' + state : '') + ', ' + countryName;
+      var geo = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(q) + '&format=json&limit=1&countrycodes=' + cc, {headers: {'Accept-Language':'en'}});
       var gd = await geo.json();
       if (gd.length) {
-        document.getElementById('ftf-lat').value = gd[0].lat;
-        document.getElementById('ftf-lng').value = gd[0].lon;
+        getEl('ftf-lat').value = gd[0].lat;
+        getEl('ftf-lng').value = gd[0].lon;
         setMsg('✓ Located: ' + city + ', ' + countryName, false);
       } else {
-        // fallback — country position API
-        var posRes = await fetch('https://countriesnow.space/api/v0.1/countries/positions', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ country: countryName })
+        // fallback: country center from countriesnow
+        var pos = await fetch('https://countriesnow.space/api/v0.1/countries/positions', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({country: countryName})
         });
-        var posData = await posRes.json();
-        if (posData.data) {
-          document.getElementById('ftf-lat').value = posData.data.lat;
-          document.getElementById('ftf-lng').value = posData.data.long;
+        var pd = await pos.json();
+        if (pd.data) {
+          getEl('ftf-lat').value = pd.data.lat;
+          getEl('ftf-lng').value = pd.data.long;
           setMsg('✓ Located: ' + countryName, false);
         } else {
-          setMsg('Could not locate city. Try selecting again.', true);
+          setMsg('Could not locate city. Try another.', true);
         }
       }
     } catch(e) {
-      setMsg('Location lookup failed. Please try again.', true);
+      setMsg('Location lookup failed. Try again.', true);
     }
   });
 
-  function setMsg(msg, err) {
-    var el = document.getElementById('ftf-msg');
-    el.textContent = msg;
-    el.style.color = err ? '#ff6b6b' : '#C9A96E';
-  }
-
+  // --- ADD PIN ---
   window.ftfAddPin = async function() {
-    var name = document.getElementById('ftf-name').value.trim();
-    var email = document.getElementById('ftf-email').value.trim();
-    var countryEl = document.getElementById('ftf-country');
-    var countryCode = countryEl.value;
+    var name = getEl('ftf-name').value.trim();
+    var email = getEl('ftf-email').value.trim();
+    var countryEl = getEl('ftf-country');
     var countryName = countryEl.selectedIndex > 0 ? countryEl.options[countryEl.selectedIndex].getAttribute('data-name') : '';
-    var state = document.getElementById('ftf-state').value;
-    var city = document.getElementById('ftf-city').value;
+    var state = getEl('ftf-state').value;
+    var city = getEl('ftf-city').value;
+    var lat = parseFloat(getEl('ftf-lat').value);
+    var lng = parseFloat(getEl('ftf-lng').value);
 
     if (!name) { setMsg('Please enter your name.', true); return; }
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setMsg('Please enter a valid email.', true); return; }
-    if (!countryCode) { setMsg('Please select your country.', true); return; }
+    if (!countryName) { setMsg('Please select your country.', true); return; }
+    if (!city) { setMsg('Please select your city.', true); return; }
+    if (!lat || !lng) { setMsg('Location not found yet. Wait a moment and try again.', true); return; }
 
-    var locationQuery = [city, state, countryName].filter(Boolean).join(', ');
-    var btn = document.getElementById('ftf-btn');
-    btn.textContent = 'Pinning...';
+    var btn = getEl('ftf-btn');
+    btn.textContent = 'Saving...';
     btn.disabled = true;
-    setMsg('Finding your location...', false);
+    setMsg('Adding your pin...', false);
 
     try {
-      // Use open.mapquestapi or geocode.maps.co as fallback
-      var geoUrl = 'https://geocode.maps.co/search?q=' + encodeURIComponent(locationQuery) + '&api_key=679b9a2f3e4f5';
-      var geo, gd, lat, lng;
-      try {
-        geo = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(locationQuery) + '&format=json&limit=1');
-        gd = await geo.json();
-        if (gd.length) { lat = parseFloat(gd[0].lat); lng = parseFloat(gd[0].lon); }
-      } catch(e1) {}
-      if (!lat) {
-        try {
-          geo = await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?localityLanguage=en');
-          gd = await geo.json();
-        } catch(e2) {}
-      }
-      if (!lat) {
-        // Use countriesnow to get city coordinates
-        var cityRes = await fetch('https://countriesnow.space/api/v0.1/countries/cities/q?country=' + encodeURIComponent(countryName));
-        var cityData = await cityRes.json();
-        // Fallback: use country center coordinates
-        var countryCenters = {
-          'United States':[37.09,-95.71],'Canada':[56.13,-106.35],'United Kingdom':[55.38,-3.44],
-          'Australia':[-25.27,133.78],'India':[20.59,78.96],'Germany':[51.17,10.45],
-          'France':[46.23,2.21],'Brazil':[-14.24,-51.93],'Mexico':[23.63,-102.55],
-          'Japan':[36.20,138.25],'China':[35.86,104.19],'South Korea':[35.91,127.77],
-          'Philippines':[12.88,121.77],'Indonesia':[-0.79,113.92],'Nigeria':[9.08,8.68],
-          'South Africa':[-30.56,22.94],'Egypt':[26.82,30.80],'UAE':[23.42,53.85],
-          'Saudi Arabia':[23.89,45.08],'Pakistan':[30.38,69.35],'Bangladesh':[23.68,90.36],
-          'Spain':[40.46,-3.75],'Italy':[41.87,12.57],'Netherlands':[52.13,5.29],
-          'Sweden':[60.13,18.64],'Norway':[60.47,8.47],'Poland':[51.92,19.15],
-          'Turkey':[38.96,35.24],'Argentina':[-38.42,-63.62],'Colombia':[4.57,-74.30],
-          'Chile':[-35.68,-71.54],'Peru':[-9.19,-75.02],'Vietnam':[14.06,108.28],
-          'Thailand':[15.87,100.99],'Malaysia':[4.21,101.97],'Singapore':[1.35,103.82],
-          'New Zealand':[-40.90,174.89],'Kenya':[-0.02,37.91],'Ghana':[7.95,-1.02],
-        };
-        var center = countryCenters[countryName] || [0, 0];
-        lat = center[0] + (Math.random()-0.5)*2;
-        lng = center[1] + (Math.random()-0.5)*2;
-      }
-      if (!lat) { setMsg('Could not locate that place. Try a different city.', true); btn.textContent='+ Add My Pin'; btn.disabled=false; return; }
-      var saveUrl = SCRIPT_URL + '?action=add&name=' + encodeURIComponent(name) + '&email=' + encodeURIComponent(email) + '&country=' + encodeURIComponent(countryName) + '&state=' + encodeURIComponent(state) + '&city=' + encodeURIComponent(city) + '&lat=' + lat + '&lng=' + lng;
-      // Use hidden iframe to send request without CORS issues
+      var saveUrl = SCRIPT_URL + '?action=add' +
+        '&name=' + encodeURIComponent(name) +
+        '&email=' + encodeURIComponent(email) +
+        '&country=' + encodeURIComponent(countryName) +
+        '&state=' + encodeURIComponent(state) +
+        '&city=' + encodeURIComponent(city) +
+        '&lat=' + lat +
+        '&lng=' + lng;
+
       var ifrm = document.createElement('iframe');
       ifrm.style.display = 'none';
       ifrm.src = saveUrl;
       document.body.appendChild(ifrm);
       await new Promise(function(resolve){ setTimeout(resolve, 2000); });
       document.body.removeChild(ifrm);
-      addMarker(name, city || state, countryName, lat, lng, true);
-      map.flyTo([lat, lng], 5, { duration: 1.2 });
+
+      addMarker(name, city, countryName, lat, lng, true);
+      map.flyTo([lat, lng], 5, {duration: 1.2});
       setMsg('Your pin has been added! Welcome to the FTF world map!', false);
-      document.getElementById('ftf-name').value = '';
-      document.getElementById('ftf-email').value = '';
-      document.getElementById('ftf-country').value = '';
-      document.getElementById('ftf-state').innerHTML = '<option value="">Select state...</option>';
-      document.getElementById('ftf-state').disabled = true;
-      document.getElementById('ftf-city').innerHTML = '<option value="">Select city...</option>';
-      document.getElementById('ftf-city').disabled = true;
+
+      getEl('ftf-name').value = '';
+      getEl('ftf-email').value = '';
+      getEl('ftf-country').value = '';
+      getEl('ftf-state').innerHTML = '<option value="">Select state...</option>';
+      getEl('ftf-state').disabled = true;
+      getEl('ftf-city').innerHTML = '<option value="">Select city...</option>';
+      getEl('ftf-city').disabled = true;
+      getEl('ftf-lat').value = '';
+      getEl('ftf-lng').value = '';
     } catch(e) {
       setMsg('Something went wrong. Please try again.', true);
     }
+
     btn.textContent = '+ Add My Pin';
     btn.disabled = false;
   };
